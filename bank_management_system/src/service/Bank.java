@@ -5,23 +5,35 @@ import bank_management_system.src.expection.*;
 
 public class Bank {
 
-    private List<Customer> customers;
-    private List<Account> accounts;
+    private Map<Integer, Customer> customers;
+    private Map<Integer, Account> accounts;
 
     private int nextAccountNumber = 100001;
 
     public Bank() {
-        customers = new ArrayList<>();
-        accounts = new ArrayList<>();
+
+        customers = new HashMap<>();
+        accounts = new HashMap<>();
     }
 
     // -------------------------
-    // Customer Operations
+    // Customer Management
     // -------------------------
 
-    public void addCustomer(Customer customer) {
+    public void addCustomer(Customer customer)
+            throws DuplicateCustomerException {
 
-        customers.add(customer);
+        int customerId = customer.getCustomerId();
+
+        if (customers.containsKey(customerId)) {
+
+            throw new DuplicateCustomerException(
+                "Customer ID " + customerId +
+                " already exists."
+            );
+        }
+
+        customers.put(customerId, customer);
 
         System.out.println(
             "Customer added successfully."
@@ -31,20 +43,22 @@ public class Bank {
     public Customer findCustomer(int customerId)
             throws CustomerNotFoundException {
 
-        for (Customer customer : customers) {
+        Customer customer =
+            customers.get(customerId);
 
-            if (customer.getCustomerId() == customerId) {
-                return customer;
-            }
+        if (customer == null) {
+
+            throw new CustomerNotFoundException(
+                "Customer " + customerId +
+                " not found."
+            );
         }
 
-        throw new CustomerNotFoundException(
-            "Customer " + customerId + " not found."
-        );
+        return customer;
     }
 
     // -------------------------
-    // Account Operations
+    // Account Management
     // -------------------------
 
     private int generateAccountNumber() {
@@ -52,7 +66,8 @@ public class Bank {
         return nextAccountNumber++;
     }
 
-    public Account createSavingsAccount(int customerId)
+    public Account createSavingsAccount(
+            int customerId)
             throws CustomerNotFoundException {
 
         Customer customer =
@@ -67,12 +82,24 @@ public class Bank {
                 customer
             );
 
-        accounts.add(account);
+        accounts.put(
+            accountNumber,
+            account
+        );
+
+        System.out.println(
+            "Savings account created successfully."
+        );
+
+        System.out.println(
+            "Account Number: " + accountNumber
+        );
 
         return account;
     }
 
-    public Account createCurrentAccount(int customerId)
+    public Account createCurrentAccount(
+            int customerId)
             throws CustomerNotFoundException {
 
         Customer customer =
@@ -87,23 +114,37 @@ public class Bank {
                 customer
             );
 
-        accounts.add(account);
+        accounts.put(
+            accountNumber,
+            account
+        );
+
+        System.out.println(
+            "Current account created successfully."
+        );
+
+        System.out.println(
+            "Account Number: " + accountNumber
+        );
 
         return account;
     }
+
     public Account findAccount(int accountNumber)
             throws AccountNotFoundException {
 
-        for (Account account : accounts) {
+        Account account =
+            accounts.get(accountNumber);
 
-            if (account.getAccountNumber() == accountNumber) {
-                return account;
-            }
+        if (account == null) {
+
+            throw new AccountNotFoundException(
+                "Account " + accountNumber +
+                " not found."
+            );
         }
 
-        throw new AccountNotFoundException(
-            "Account " + accountNumber + " not found."
-        );
+        return account;
     }
 
     // -------------------------
@@ -114,10 +155,19 @@ public class Bank {
             int accountNumber,
             double amount)
             throws AccountNotFoundException,
-                InvalidAmountException {
+                   InvalidAmountException,
+                   AccountClosedException {
 
         Account account =
             findAccount(accountNumber);
+
+        if (!account.isActive()) {
+
+            throw new AccountClosedException(
+                "Account " + accountNumber +
+                " is closed."
+            );
+        }
 
         account.deposit(amount);
     }
@@ -126,41 +176,22 @@ public class Bank {
             int accountNumber,
             double amount)
             throws AccountNotFoundException,
-                InvalidAmountException,
-                InsufficientBalanceException {
+                   InvalidAmountException,
+                   InsufficientBalanceException,
+                   AccountClosedException {
 
         Account account =
             findAccount(accountNumber);
 
-        account.withdraw(amount);
-    }
+        if (!account.isActive()) {
 
-    public void checkBalance(int accountNumber) throws AccountNotFoundException {
-
-        Account account =
-            findAccount(accountNumber);
-
-        if (account == null) {
-            System.out.println(
-                "Account not found."
+            throw new AccountClosedException(
+                "Account " + accountNumber +
+                " is closed."
             );
-            return;
         }
 
-        System.out.println(
-            "Account Number: "
-            + account.getAccountNumber()
-        );
-
-        System.out.println(
-            "Account Holder: "
-            + account.getCustomer().getName()
-        );
-
-        System.out.println(
-            "Balance: ₹"
-            + account.getBalance()
-        );
+        account.withdraw(amount);
     }
 
     public void transferMoney(
@@ -168,8 +199,17 @@ public class Bank {
             int toAccountNumber,
             double amount)
             throws AccountNotFoundException,
-                InvalidAmountException,
-                InsufficientBalanceException {
+                   InvalidAmountException,
+                   InsufficientBalanceException,
+                   AccountClosedException {
+
+        if (fromAccountNumber == toAccountNumber) {
+
+            throw new InvalidAmountException(
+                "Source and destination accounts " +
+                "cannot be the same."
+            );
+        }
 
         Account fromAccount =
             findAccount(fromAccountNumber);
@@ -177,10 +217,21 @@ public class Bank {
         Account toAccount =
             findAccount(toAccountNumber);
 
-        if (fromAccountNumber == toAccountNumber) {
+        if (!fromAccount.isActive()) {
 
-            throw new InvalidAmountException(
-                "Source and destination accounts cannot be the same."
+            throw new AccountClosedException(
+                "Source account " +
+                fromAccountNumber +
+                " is closed."
+            );
+        }
+
+        if (!toAccount.isActive()) {
+
+            throw new AccountClosedException(
+                "Destination account " +
+                toAccountNumber +
+                " is closed."
             );
         }
 
@@ -188,4 +239,111 @@ public class Bank {
 
         toAccount.deposit(amount);
     }
+
+    // -------------------------
+    // Account Closing
+    // -------------------------
+
+    public void closeAccount(int accountNumber)
+            throws AccountNotFoundException,
+                   AccountClosedException,
+                   AccountHasBalanceException {
+
+        Account account =
+            findAccount(accountNumber);
+
+        if (!account.isActive()) {
+
+            throw new AccountClosedException(
+                "Account " + accountNumber +
+                " is already closed."
+            );
+        }
+
+        if (account.getBalance() != 0) {
+
+            throw new AccountHasBalanceException(
+                "Account cannot be closed. " +
+                "Remaining balance: ₹" +
+                account.getBalance()
+            );
+        }
+
+        account.closeAccount();
+
+        System.out.println(
+            "Account " + accountNumber +
+            " closed successfully."
+        );
+    }
+
+    // -------------------------
+    // Display Methods
+    // -------------------------
+
+    public void listCustomers() {
+
+        System.out.println("\n==============================");
+        System.out.println("         CUSTOMERS");
+        System.out.println("==============================");
+
+        for (Customer customer : customers.values()) {
+
+            System.out.println(
+                "ID      : " +
+                customer.getCustomerId()
+            );
+
+            System.out.println(
+                "Name    : " +
+                customer.getName()
+            );
+
+            System.out.println(
+                "Mobile  : " +
+                customer.getMobileNumber()
+            );
+
+            System.out.println(
+                "Email   : " +
+                customer.getEmail()
+            );
+
+            System.out.println("------------------------------");
+        }
+    }
+
+    public void listAccounts() {
+
+        System.out.println("\n==============================");
+        System.out.println("         ACCOUNTS");
+        System.out.println("==============================");
+
+        for (Account account : accounts.values()) {
+
+            System.out.println(
+                "Account Number : " +
+                account.getAccountNumber()
+            );
+
+            System.out.println(
+                "Customer       : " +
+                account.getCustomer().getName()
+            );
+
+            System.out.println(
+                "Balance        : ₹" +
+                account.getBalance()
+            );
+
+            System.out.println(
+                "Status         : " +
+                account.getStatus()
+            );
+
+            System.out.println("------------------------------");
+        }
+    }
+
+    
 }

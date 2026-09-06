@@ -32,7 +32,7 @@ public class CurrentAccount extends Account {
 
         balance -= amount;
 
-        recordTransactions(
+        recordTransaction(
             "WITHDRAW",
             amount
         );

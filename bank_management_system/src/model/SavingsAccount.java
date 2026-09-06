@@ -31,7 +31,7 @@ public class SavingsAccount extends Account {
 
         balance -= amount;
 
-        recordTransactions(
+        recordTransaction(
             "WITHDRAW",
             amount
         );
